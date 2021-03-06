@@ -78,23 +78,23 @@ def get_tradable_exchanges_kraken(k, quote, verbose=False):
             if q in altname:
                 exchanges.append(wsname)
                 # print(altname, " ", wsname)
-    print("exchanges")
-    print(exchanges)
+    # print("exchanges")
+    # print(exchanges)
     quote_lst = [[] for i in range(0,len(quote))]
     for ex in exchanges:
         for i, q in enumerate(quote):
             if q in ex:
                 curr = ex.split("/")[0] if ex.split("/")[0] != q else ex.split("/")[1]
                 quote_lst[i].append(curr)
-    print("quote_lst")
-    print(quote_lst)
+    # print("quote_lst")
+    # print(quote_lst)
     quote_comb = list(combinations(quote, 2))
     quote_comb_idx = list(combinations([i for i in range(len(quote))],2))
     matches = [[] for i in range(len(quote_comb))]
     for i in range(0, len(matches)):
         matches[i] = set(quote_lst[quote_comb_idx[i][0]]) & set(quote_lst[quote_comb_idx[i][1]])
-    print("matches")
-    print(matches)
+    # print("matches")
+    # print(matches)
     tex = []
     tpairs = []
     # tpairs = [[] for i in range(0,len(matches))]
@@ -104,10 +104,10 @@ def get_tradable_exchanges_kraken(k, quote, verbose=False):
                continue 
             tpairs.append([m + "/" + quote[quote_comb_idx[i][0]], m + "/" + quote[quote_comb_idx[i][1]]])
             tex.append((quote[quote_comb_idx[i][0]], m, quote[quote_comb_idx[i][1]]))
-    print("tpairs")
-    print(tpairs)
-    print("tex")
-    print(tex)
+    # print("tpairs")
+    # print(tpairs)
+    # print("tex")
+    # print(tex)
     return tex, tpairs, products["result"]
 
 def ask_or_bid(pair, ex):
@@ -132,7 +132,7 @@ def compare_exchange_rate_kraken(k, ex, pairs, verbose=False):
     fiat2  = ex[2]
     last_price  = np.zeros((2,1))
     order_price = np.zeros((2,1))
-    print(pairs)
+    # print(pairs)
     for i, pair in enumerate(pairs):
         try:
             pair = pair.replace("/", "")
@@ -162,11 +162,11 @@ def get_all_ex_rate_diffs(client, tex, pairs, exchange_provider):
     for i, ex in enumerate(tex):
         diff = 100
         count = 0
-        while diff != None and abs(diff) > 1.1 and count < 10:
+        while diff != None and abs(diff) > 1.1 and count < 30:
             if exchange_provider == "coinbase":
                 diff = compare_exchange_rate_coinbase(client, ex[1], ex[0], ex[2])
             if exchange_provider == "kraken":
-                diff = compare_exchange_rate_kraken(client, ex, [pairs_kr[0][i], pairs_kr[1][i]])
+                diff = compare_exchange_rate_kraken(client, ex, pairs_kr[i])
             print("% exchange rate difference " +  str(diff))
             time.sleep(0.2)
             count = count + 1
@@ -197,16 +197,17 @@ def execute_transaction(pair, ex, amount, n):
     print(logStr)
     logfile.write(logStr)
     response = k.query_private('AddOrder',
-	  			{'pair': pair,
-	  			 'type': buy_or_sell,
-	  			 'ordertype': 'market',
-	  			 'volume': amount,
-                                 'validate': 'True'})
+    			{'pair': pair,
+    			 'type': buy_or_sell,
+    			 'ordertype': 'market',
+    			 'volume': amount,
+                         'validate': 'True'})
+    # pdb.set_trace()
     # response = k.query_private('AddOrder',
 	#   			{'pair': pair,
-	#   			 'type': buy_or_sell,
-	#   			 'ordertype': 'market',
-	#   			 'volume': amount})
+	#    			 'type': buy_or_sell,
+	#    			 'ordertype': 'market',
+	#    			 'volume': amount})
 
 def reverse_exchange(ex, pairs):
     rev_ex = [ex[2], ex[1], ex[0]]
@@ -226,16 +227,15 @@ def iterate_algorithm(client, tex, pairs_kr, exchange_provider, products):
             if only_fiats_in_exchange(ex):
                 print("only fiats")
                 continue
-            if ex[0] != "EUR" and ex[0] != "GBP":
-                print("Not EUR or GBP for starting currency")
-                continue
-            time.sleep(0.2)
+            # time.sleep(0.1)
             diff = compare_exchange_rate_kraken(client, ex, pairs)
             print(diff)
-            if abs(diff) > 2:
+            if abs(diff) > 8:
                 if diff < 0:
                    ex, pairs = reverse_exchange(ex, pairs) 
-                if ex[0] == "USD":
+                if ex[0] != "EUR" and ex[0] != "GBP":
+                # if ex[0] != "GBP"
+                    print("Not EUR or GBP for starting currency")
                     continue
                 logStr = "For a difference of " + str(diff) + "\n"
                 logfile.write(logStr)
@@ -246,33 +246,32 @@ def iterate_algorithm(client, tex, pairs_kr, exchange_provider, products):
                     while len(response["result"]["open"]) == 1:
                         print("Waiting for order to close")
                         response = k.query_private('OpenOrders')
+                        # time.sleep(0.05)
                 response = k.query_private('TradeBalance',
                                 {'asset': "EUR"})
                 logStr = "Equivalent balance in EUR: " + response["result"]["eb"] + "\n"
                 print(logStr)
                 logfile.write(logStr)
                 time.sleep(5)
+                # diff = compare_exchange_rate_kraken(client, ex, pairs)
+                # print(diff)
     
+# public_client = cbpro.PublicClient()
+# products_cb = public_client.get_products()
 
-quote = {'EUR', 'GBP', 'USD', "CAD", "CHF"}
+# quote = {'EUR', 'GBP', 'USD', "CAD", "CHF"}
 
 fiat_list = ["EUR", "USD", "GBP", "CAD", "CHF", "JPY", "AUD"]
+
+quote = fiat_list
 
 k = krakenex.API()
 k.load_key('kraken.key')
 
-public_client = cbpro.PublicClient()
-products_cb = public_client.get_products()
-
 logfile = open("logFile.txt", "a")
-
-# tex_cb = get_tradable_exchanges_coinbase(public_client, quote, verbose=False)
-# get_all_ex_rate_diffs(public_client, tex_cb, "coinbase")
 
 tex_kr, pairs_kr, products = get_tradable_exchanges_kraken(k, quote)
 
-## TODO INVESTIGATE TRADABLE EXCHANGES
-print(tex_kr)
 # get_all_ex_rate_diffs(k, tex_kr, pairs_kr, "kraken")
 
 iterate_algorithm(k, tex_kr, pairs_kr, "kraken", products)
