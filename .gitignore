@@ -1,3 +1,4 @@
 *.swp
 kraken.key
 bin/*
+logfile.txt
